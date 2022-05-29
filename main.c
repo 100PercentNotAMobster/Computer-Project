@@ -1,6 +1,3 @@
-//I figured out my implementations are wrong so maybe I'm done with this? I put a lot of work in tho
-//nah I think I'll keep doing it
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
