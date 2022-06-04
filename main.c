@@ -3,8 +3,8 @@
 #include <windows.h>
 #include <stdbool.h>
 
-#define FILE_SIZE 100000
-#define RAM_SIZE 32768
+#define FILE_SIZE 200000
+#define RAM_SIZE 100000
 //maybe change to 16 bit instruction widht? even 32? idk
 //I need to learn C better :( I dont think I know enough ::::(((((((
 char PC[16]; //program counter
@@ -19,11 +19,10 @@ flag 3: greater
 flag 4: less
 flag 5: memory error (tried to read memory that does not exist)
 */
-char RAM[RAM_SIZE][8]; //30KB of RAM
+char RAM[RAM_SIZE][8];
 
 void getReg1(char *output){
     for(int i = 0; i < 16; i++){
-        printf("pointer to output: %p\n", output);
         *output = reg1[i];
         output++;
     }
@@ -88,12 +87,14 @@ void getFromMemory(int lineStartAt, int linesToGet, char *output){
 }
 
 int binaryToIntUnsignedFive(char binary[9]){
-    //takes an 8 bit binary number and returns the integer value of the leftmost three bits (really these are char bytes)
+    //takes an 8 bit binary number and returns the integer value of the leftmost five bits (really these are char bytes)
     int returnNum = 0;
     int index = 5;
     for(int i = 0; i <= 5; i++){
         if(binary[i] == '1'){
             returnNum += twoToThePowerOf(index-1);
+        }
+        else{
         }
         index--;
 
@@ -162,19 +163,39 @@ void doOp(char *opcode){
         }
         if(intOpcode == 1){
             //does the mov op
+            printf("calling mov\n");
             mov(opcode);
         }
         if(intOpcode == 2){
             die();
         }
+        if(intOpcode == 3){
+            cmp(opcode);
+        }
+        if(intOpcode == 4){
+            not(opcode);
+        }
+        if(intOpcode == 5){
+            and(opcode);
+        }
+        if(intOpcode == 6){
+            or(opcode);
+        }
+        if(intOpcode == 7){
+            xor(opcode);
+        }
+        if(intOpcode == 8){
+            jmp(opcode);
+        }
 
 }
 
 void mov(char *opcode){
+    printf("in mov\n");
     char smallStr[5];
     substrAny(opcode, smallStr, 5, 11);
     int operand = binaryToIntUnsigned(smallStr, 5);
-    char *opcode2 = opcode;
+    printf("operand: %d\n", operand);
 
     if(operand == 0){
        setReg2(reg1, 16);
@@ -183,15 +204,14 @@ void mov(char *opcode){
         setReg1(reg2, 16);
     }
     else if(operand == 2){
-        printf("opreand: 2\n");
         setPC(reg1);
     }
     else if(operand == 3){
-        printf("operand: 3\n");
         setPC(reg2);
 
     }
     else if(operand == 4){
+        //gets the content at the memory address in register 1 and puts it in register 1
         char toPut[16];
         char toStartAtBin[16];
         getReg1(&toStartAtBin);
@@ -201,6 +221,7 @@ void mov(char *opcode){
         setReg1(output, 16);
     }
     else if(operand == 5){
+        //gets the content at the memory address in register 2 and puts it in register 2
         char toPut[16];
         char toStartAtBin[16];
         getReg2(&toStartAtBin);
@@ -211,10 +232,52 @@ void mov(char *opcode){
 
     }
     else if(operand == 6){
-        //move content at the memory address in register 1 into regisster 2
+        //gets the content at the memory address in register 1 and puts it in register 2
+        char toPut[16];
+        char toStartAtBin[16];
+        getReg1(&toStartAtBin);
+        int num = binaryToIntUnsigned(toStartAtBin, 16);
+        char output[16];
+        getFromRAM(num, 2, output);
+        setReg2(output, 16);
+
     }
     else if(operand == 7){
-        //move the content at the memory address in register 2 into regisster 1
+        //gets the content at the memory address in register 2 and puts it in register 1
+        char toPut[16];
+        char toStartAtBin[16];
+        getReg2(&toStartAtBin);
+        int num = binaryToIntUnsigned(toStartAtBin, 16);
+        char output[16];
+        getFromRAM(num, 2, output);
+        setReg1(output, 16);
+    }
+
+    else if(operand == 8){
+        //go to the pointer pointed to by register 1 and write what's in register 2 to that address
+        char toPut[16];
+        char toFind[16];
+        getReg1(toFind);
+        int num = binaryToIntUnsigned(toFind, 16);
+        char output[32];
+        getFromRAM(num, 4, output);
+        int outputNum = binaryToIntUnsigned(output, 32);
+        writeToRAM(outputNum, 2, reg2);
+    }
+
+    else if(operand == 9){
+        //loads the value at two lines above the current line into register 1
+        int PCInt = binaryToIntUnsigned(PC, 16);
+        PCInt -= 2;
+        char output[16];
+        getFromRAM(PCInt, 2, reg1);
+    }
+    else if(operand == 10){
+        //loads the value at two lines above the current line into register 2
+        int PCInt = binaryToIntUnsigned(PC, 16);
+        PCInt -= 2;
+        char output[16];
+        getFromRAM(PCInt, 2, reg2);
     }
 
 
@@ -380,12 +443,13 @@ int binaryToIntUnsigned(char *string, int size){
     //takes an 8 bit binary number and returns its integer value (unisgned)
     int returnNum = 0;
     int index = size;
-    for(int i = 0; i <= size; i++){
+    for(int i = 0; i <= size-1; i++){
         if(string[i] == '1'){
             returnNum += twoToThePowerOf(index-1);
         }
+        else{
+        }
         index--;
-
     }
     return returnNum;
 }
@@ -488,13 +552,198 @@ void start(){
     fillRAMWithZeros();
 }
 
+bool cmpFunction(char *char1, char *char2, int length){
+    //function to test if two strings are equivilent
+    for(int i = 0; i < length; i++){
+        if(char1[i] != char2[i]){
+            return false;
+        }
+    }
+    return true;
+}
+
+
+void cmp(char *opcode){
+    //compares two 16 bit values and updates the equals flag based on there value
+    char smallStr[5];
+    substrAny(opcode, smallStr, 5, 11);
+    int operand = binaryToIntUnsigned(smallStr, 5);
+    if(operand == 0){
+        //compares the contents of register 1 and register 2
+        bool isEqual = cmpFunction(reg1, reg2, 16);
+        if(isEqual){
+            flags[1] = '1';
+        }
+        else{
+            flags[1] = '0';
+        }
+    }
+}
+
+void not(char *opcode){
+    //does the logical not operation to a specified register
+    char smallStr[5];
+    substrAny(opcode, smallStr, 5, 11);
+    int operand = binaryToIntUnsigned(smallStr, 5);
+    if(operand == 0){
+        //does the logical not operation to register 1
+        for(int i = 0; i < 16; i++){
+            if(reg1[i] == '1'){
+                reg1[i] = '0';
+            }
+            else if(reg1[i] == '0'){
+                reg1[i] = '1';
+            }
+        }
+    }
+}
+
+void and(char *opcode){
+    char smallStr[5];
+    substrAny(opcode, smallStr, 5, 11);
+    int operand = binaryToIntUnsigned(smallStr, 5);
+    if(operand == 0){
+        for(int i = 0; i < 16; i++){
+            if(reg1[i] == '1' && reg2[i] == '1'){
+                reg1[i] = '1';
+            }
+            else{
+                reg1[i] = '0';
+            }
+        }
+    }
+}
+
+void or(char *opcode){
+    char smallStr[5];
+    substrAny(opcode, smallStr, 5, 11);
+    int operand = binaryToIntUnsigned(smallStr, 5);
+    if(operand == 0){
+        for(int i = 0; i < 16; i++){
+            if(reg1[i] == '1' || reg2[i] == '1'){
+                reg1[i] = '1';
+            }
+            else{
+                reg1[i] = '0';
+            }
+        }
+    }
+
+}
+
+int opcodeToInt(char *opcode){
+    //converts a character string of 1's and 0's called opcode into a integer number
+    //retruns the integer number
+    char smallStr[5];
+    substrAny(opcode, smallStr, 5, 11);
+    int operand = binaryToIntUnsigned(smallStr, 5);
+
+    return operand;
+
+}
+
+void xor(char *opcode){
+    char smallStr[5];
+    substrAny(opcode, smallStr, 5, 11);
+    int operand = binaryToIntUnsigned(smallStr, 5);
+    if(operand == 0){
+        for(int i = 0; i < 16; i++){
+            if(reg1[i] != reg2[i]){
+                reg1[i] = '1';
+            }
+            else{
+                reg1[i] = '0';
+            }
+        }
+    }
+
+}
+
+void addRecursive(char *add1, char *add2, int target, bool carry){
+    //carry is the carry bit of binary addition
+    //target is the target part of the two arrays. It starts at 0 and incarments by 1
+    if(add1[target] == 1 && add2[target] == 1){
+        if(carry = false){
+            carry = true;
+            add1[target] = '1';
+        }
+        else{
+            add1[target] = '1';
+        }
+
+    if(add1[target] == 1 || add2[target] == 1){
+        add1[target] = '1';
+        }
+    else if(carry == true){
+        add1[target] = '1';
+        }
+    else{
+        add1[target] = '0';
+    }
+    addRecursive(add1, add2, target++, carry);
+
+    }
+
+}
+
+void jmp(char *opcode){
+    //jumps two lines behind an address specified by a register, the idea is that the PC will be incramented by two lines
+    int num = opcodeToInt(opcode);
+    if(num == 0){
+        int num2 = binaryToIntUnsigned(reg1, 16);
+        num2 -= 2;
+        decimalToBinary(num2, PC, 16);
+        printf("PC (in jmp): ");
+        printWithoutNullTerminator(PC, 16);
+        printf("\n");
+    }
+    if(num == 1){
+        int num2 = binaryToIntUnsigned(reg2, 16);
+        num2 -= 2;
+        decimalToBinary(num2, PC, 16);
+    }
+
+}
+
+void add(char *opcode, char *add1, char *add2){
+    int num = opcodeToInt(opcode);
+    if(num == 0){
+        addRecursive(add1, add2, 0, false);
+    }
+}
+
+void setFlagsToZero(){
+    for(int i = 0; i < 5; i++){
+        flags[i] = '0';
+    }
+}
+
+void printWithoutNullTerminator(char *output, int numOfChars){
+    //does not print a new line
+    for(int i = 0; i < numOfChars; i++){
+        printf("%c", output[i]);
+    }
+}
+
+void print(char *opcode){
+    int intOpcode = opcodeToInt(opcode);
+    if(intOpcode == 0){
+
+    }
+}
+
 int main(){
     fillRAMWithZeros();
-    char instruction[16] = "0000100000000101";
+    int PCNum = 6;
+    decimalToBinary(PCNum, PC, 16);
+    char instruction[16] = "0100000000000001";
+    char setReg2To[16] = "0000000000000100";
+    setReg2(setReg2To, 16);
+    char toRAM[16] = "0000100000000000";
+    writeToRAM(4, 2, toRAM);
     doOp(instruction);
-    char *printMe[17];
-    getReg2(printMe);
-    printMe[16] = '\0';
-    printf("reg 1: %s", printMe);
-
+    PCNum = binaryToIntUnsigned(PC, 16);
+    PCNum += 2;
+    getFromRAM(PCNum, 2, instruction);
+    doOp(instruction);
 }
